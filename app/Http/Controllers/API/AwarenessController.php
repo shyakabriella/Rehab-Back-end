@@ -9,9 +9,9 @@ use App\Models\Resource;
 use App\Models\ResourceCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class AwarenessController extends BaseController
 {
@@ -491,15 +491,29 @@ class AwarenessController extends BaseController
             'summary' => 'nullable|string|max:3000',
             'content' => 'nullable|string|max:30000',
             'resource_type' => 'nullable|in:article,video,audio,guide,tip,external_link',
-            'media_url' => 'nullable|string|max:1000',
             'external_url' => 'nullable|string|max:1000',
-            'thumbnail' => 'nullable|string|max:1000',
+
+            // ✅ Upload files instead of typing URL
+            'thumbnail' => 'nullable|image|mimes:jpg,jpeg,png,webp,gif|max:5120',
+            'media' => 'nullable|file|mimes:jpg,jpeg,png,webp,gif,mp4,webm,ogg,mp3,wav,pdf|max:51200',
+
             'status' => 'nullable|in:draft,published,archived',
             'is_featured' => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
             return $this->sendError('Validation Error.', $validator->errors());
+        }
+
+        $thumbnailPath = null;
+        $mediaPath = null;
+
+        if ($request->hasFile('thumbnail')) {
+            $thumbnailPath = $request->file('thumbnail')->store('awareness/thumbnails', 'public');
+        }
+
+        if ($request->hasFile('media')) {
+            $mediaPath = $request->file('media')->store('awareness/media', 'public');
         }
 
         $resource = Resource::create([
@@ -510,9 +524,9 @@ class AwarenessController extends BaseController
             'summary' => $request->summary,
             'content' => $request->content,
             'resource_type' => $request->resource_type ?? 'article',
-            'media_url' => $request->media_url,
+            'media_url' => $mediaPath,
             'external_url' => $request->external_url,
-            'thumbnail' => $request->thumbnail,
+            'thumbnail' => $thumbnailPath,
             'status' => $request->status ?? 'draft',
             'is_featured' => $request->boolean('is_featured'),
         ]);
@@ -542,7 +556,10 @@ class AwarenessController extends BaseController
 
         $resource->increment('views_count');
 
-        return $this->sendResponse($resource->fresh(['category:id,name,slug,type', 'creator:id,name,email']), 'Resource fetched successfully.');
+        return $this->sendResponse(
+            $resource->fresh(['category:id,name,slug,type', 'creator:id,name,email']),
+            'Resource fetched successfully.'
+        );
     }
 
     public function updateResource(Request $request, int $id): JsonResponse
@@ -567,9 +584,12 @@ class AwarenessController extends BaseController
             'summary' => 'nullable|string|max:3000',
             'content' => 'nullable|string|max:30000',
             'resource_type' => 'nullable|in:article,video,audio,guide,tip,external_link',
-            'media_url' => 'nullable|string|max:1000',
             'external_url' => 'nullable|string|max:1000',
-            'thumbnail' => 'nullable|string|max:1000',
+
+            // ✅ Upload files instead of typing URL
+            'thumbnail' => 'nullable|image|mimes:jpg,jpeg,png,webp,gif|max:5120',
+            'media' => 'nullable|file|mimes:jpg,jpeg,png,webp,gif,mp4,webm,ogg,mp3,wav,pdf|max:51200',
+
             'status' => 'nullable|in:draft,published,archived',
             'is_featured' => 'nullable|boolean',
         ]);
@@ -584,9 +604,7 @@ class AwarenessController extends BaseController
             'summary',
             'content',
             'resource_type',
-            'media_url',
             'external_url',
-            'thumbnail',
             'status',
         ]);
 
@@ -598,9 +616,25 @@ class AwarenessController extends BaseController
             $data['is_featured'] = $request->boolean('is_featured');
         }
 
+        if ($request->hasFile('thumbnail')) {
+            if ($resource->thumbnail && Storage::disk('public')->exists($resource->thumbnail)) {
+                Storage::disk('public')->delete($resource->thumbnail);
+            }
+
+            $data['thumbnail'] = $request->file('thumbnail')->store('awareness/thumbnails', 'public');
+        }
+
+        if ($request->hasFile('media')) {
+            if ($resource->media_url && Storage::disk('public')->exists($resource->media_url)) {
+                Storage::disk('public')->delete($resource->media_url);
+            }
+
+            $data['media_url'] = $request->file('media')->store('awareness/media', 'public');
+        }
+
         $resource->update($data);
 
-        return $this->sendResponse($resource, 'Resource updated successfully.');
+        return $this->sendResponse($resource->fresh(), 'Resource updated successfully.');
     }
 
     public function deleteResource(Request $request, int $id): JsonResponse
@@ -617,6 +651,14 @@ class AwarenessController extends BaseController
             return $this->sendError('Resource not found.', [
                 'error' => 'This resource does not exist.'
             ]);
+        }
+
+        if ($resource->thumbnail && Storage::disk('public')->exists($resource->thumbnail)) {
+            Storage::disk('public')->delete($resource->thumbnail);
+        }
+
+        if ($resource->media_url && Storage::disk('public')->exists($resource->media_url)) {
+            Storage::disk('public')->delete($resource->media_url);
         }
 
         $resource->delete();

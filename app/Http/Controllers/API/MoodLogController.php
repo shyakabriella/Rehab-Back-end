@@ -12,12 +12,52 @@ use Illuminate\Validation\Rule;
 class MoodLogController extends BaseController
 {
     /**
-     * Get all mood logs for logged-in user
+     * Check if authenticated user is admin.
+     */
+    private function canViewAllMoodLogs($user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        if (method_exists($user, 'isAdmin') && $user->isAdmin()) {
+            return true;
+        }
+
+        $roleName = optional($user->role)->name;
+
+        return $roleName === 'admin';
+    }
+
+    /**
+     * Get mood logs.
+     *
+     * Admin: can see all users' mood logs.
+     * Normal user: can see only own mood logs.
      */
     public function index(Request $request): JsonResponse
     {
-        $query = MoodLog::where('user_id', $request->user()->id)
-            ->orderByDesc('logged_date');
+        $user = $request->user();
+        $isAdmin = $this->canViewAllMoodLogs($user);
+
+        $query = MoodLog::query()
+            ->orderByDesc('logged_date')
+            ->orderByDesc('created_at');
+
+        if ($isAdmin) {
+            /*
+             * Admin can see all users.
+             * Optional filter:
+             * /api/mood-logs?user_id=5
+             */
+            $query->with('user:id,name,email');
+
+            if ($request->filled('user_id')) {
+                $query->where('user_id', $request->user_id);
+            }
+        } else {
+            $query->where('user_id', $user->id);
+        }
 
         if ($request->filled('date_from')) {
             $query->whereDate('logged_date', '>=', $request->date_from);
@@ -27,13 +67,23 @@ class MoodLogController extends BaseController
             $query->whereDate('logged_date', '<=', $request->date_to);
         }
 
-        $moodLogs = $query->paginate(15);
+        if ($request->filled('mood')) {
+            $query->where('mood', $request->mood);
+        }
+
+        if ($request->filled('had_craving')) {
+            $query->where('had_craving', $request->boolean('had_craving'));
+        }
+
+        $moodLogs = $query->paginate($request->integer('per_page', 15));
 
         return $this->sendResponse($moodLogs, 'Mood logs fetched successfully.');
     }
 
     /**
-     * Create daily mood log
+     * Create daily mood log.
+     *
+     * Normal users create logs for themselves.
      */
     public function store(Request $request): JsonResponse
     {
@@ -55,7 +105,7 @@ class MoodLogController extends BaseController
                     'tired',
                     'calm',
                     'lonely',
-                    'motivated'
+                    'motivated',
                 ]),
             ],
             'stress_level' => 'nullable|integer|min:0|max:10',
@@ -94,17 +144,29 @@ class MoodLogController extends BaseController
     }
 
     /**
-     * Get one mood log
+     * Get one mood log.
+     *
+     * Admin: can see any mood log.
+     * Normal user: can see only own mood log.
      */
     public function show(Request $request, int $id): JsonResponse
     {
-        $moodLog = MoodLog::where('user_id', $request->user()->id)
-            ->where('id', $id)
-            ->first();
+        $user = $request->user();
+        $isAdmin = $this->canViewAllMoodLogs($user);
+
+        $query = MoodLog::query()->where('id', $id);
+
+        if ($isAdmin) {
+            $query->with('user:id,name,email');
+        } else {
+            $query->where('user_id', $user->id);
+        }
+
+        $moodLog = $query->first();
 
         if (!$moodLog) {
             return $this->sendError('Mood log not found.', [
-                'error' => 'This mood log does not exist or does not belong to this user.'
+                'error' => 'This mood log does not exist or you do not have permission to view it.',
             ]);
         }
 
@@ -112,7 +174,9 @@ class MoodLogController extends BaseController
     }
 
     /**
-     * Update mood log
+     * Update mood log.
+     *
+     * Kept owner-only for privacy.
      */
     public function update(Request $request, int $id): JsonResponse
     {
@@ -124,7 +188,7 @@ class MoodLogController extends BaseController
 
         if (!$moodLog) {
             return $this->sendError('Mood log not found.', [
-                'error' => 'This mood log does not exist or does not belong to this user.'
+                'error' => 'This mood log does not exist or does not belong to this user.',
             ]);
         }
 
@@ -141,7 +205,7 @@ class MoodLogController extends BaseController
                     'tired',
                     'calm',
                     'lonely',
-                    'motivated'
+                    'motivated',
                 ]),
             ],
             'stress_level' => 'nullable|integer|min:0|max:10',
@@ -180,7 +244,9 @@ class MoodLogController extends BaseController
     }
 
     /**
-     * Delete mood log
+     * Delete mood log.
+     *
+     * Kept owner-only for privacy.
      */
     public function destroy(Request $request, int $id): JsonResponse
     {
@@ -190,7 +256,7 @@ class MoodLogController extends BaseController
 
         if (!$moodLog) {
             return $this->sendError('Mood log not found.', [
-                'error' => 'This mood log does not exist or does not belong to this user.'
+                'error' => 'This mood log does not exist or does not belong to this user.',
             ]);
         }
 
@@ -200,17 +266,37 @@ class MoodLogController extends BaseController
     }
 
     /**
-     * Get today's mood log
+     * Get today's mood log.
+     *
+     * Admin: sees all mood logs submitted today.
+     * Normal user: sees own mood log for today.
      */
     public function today(Request $request): JsonResponse
     {
-        $moodLog = MoodLog::where('user_id', $request->user()->id)
+        $user = $request->user();
+        $isAdmin = $this->canViewAllMoodLogs($user);
+
+        if ($isAdmin) {
+            $query = MoodLog::with('user:id,name,email')
+                ->whereDate('logged_date', now()->toDateString())
+                ->orderByDesc('created_at');
+
+            if ($request->filled('user_id')) {
+                $query->where('user_id', $request->user_id);
+            }
+
+            $moodLogs = $query->paginate($request->integer('per_page', 15));
+
+            return $this->sendResponse($moodLogs, 'Today mood logs fetched successfully.');
+        }
+
+        $moodLog = MoodLog::where('user_id', $user->id)
             ->whereDate('logged_date', now()->toDateString())
             ->first();
 
         if (!$moodLog) {
             return $this->sendError('No mood log today.', [
-                'error' => 'This user has not added mood log for today.'
+                'error' => 'This user has not added mood log for today.',
             ]);
         }
 
@@ -218,36 +304,89 @@ class MoodLogController extends BaseController
     }
 
     /**
-     * Simple mood summary for dashboard/mobile
+     * Mood summary.
+     *
+     * Admin: sees summary for all users.
+     * Normal user: sees own summary only.
      */
     public function summary(Request $request): JsonResponse
     {
-        $userId = $request->user()->id;
+        $user = $request->user();
+        $isAdmin = $this->canViewAllMoodLogs($user);
 
-        $totalLogs = MoodLog::where('user_id', $userId)->count();
+        $query = MoodLog::query();
 
-        $latestLog = MoodLog::where('user_id', $userId)
+        if (!$isAdmin) {
+            $query->where('user_id', $user->id);
+        } elseif ($request->filled('user_id')) {
+            $query->where('user_id', $request->user_id);
+        }
+
+        if ($request->filled('date_from')) {
+            $query->whereDate('logged_date', '>=', $request->date_from);
+        }
+
+        if ($request->filled('date_to')) {
+            $query->whereDate('logged_date', '<=', $request->date_to);
+        }
+
+        $totalLogs = (clone $query)->count();
+
+        $latestLogQuery = clone $query;
+
+        if ($isAdmin) {
+            $latestLogQuery->with('user:id,name,email');
+        }
+
+        $latestLog = $latestLogQuery
             ->orderByDesc('logged_date')
+            ->orderByDesc('created_at')
             ->first();
 
-        $averageStress = MoodLog::where('user_id', $userId)
+        $averageStress = (clone $query)
             ->whereNotNull('stress_level')
             ->avg('stress_level');
 
-        $averageCraving = MoodLog::where('user_id', $userId)
+        $averageCraving = (clone $query)
             ->whereNotNull('craving_level')
             ->avg('craving_level');
 
-        $highCravingDays = MoodLog::where('user_id', $userId)
+        $averageEnergy = (clone $query)
+            ->whereNotNull('energy_level')
+            ->avg('energy_level');
+
+        $highCravingDays = (clone $query)
             ->where('craving_level', '>=', 7)
             ->count();
 
+        $totalHadCraving = (clone $query)
+            ->where('had_craving', true)
+            ->count();
+
+        $moodBreakdown = (clone $query)
+            ->selectRaw('mood, COUNT(*) as total')
+            ->groupBy('mood')
+            ->orderByDesc('total')
+            ->get();
+
+        $sleepQualityBreakdown = (clone $query)
+            ->whereNotNull('sleep_quality')
+            ->selectRaw('sleep_quality, COUNT(*) as total')
+            ->groupBy('sleep_quality')
+            ->orderByDesc('total')
+            ->get();
+
         $data = [
+            'scope' => $isAdmin ? 'all_users' : 'my_logs',
             'total_logs' => $totalLogs,
             'latest_log' => $latestLog,
             'average_stress_level' => $averageStress ? round($averageStress, 2) : 0,
             'average_craving_level' => $averageCraving ? round($averageCraving, 2) : 0,
+            'average_energy_level' => $averageEnergy ? round($averageEnergy, 2) : 0,
             'high_craving_days' => $highCravingDays,
+            'total_had_craving' => $totalHadCraving,
+            'mood_breakdown' => $moodBreakdown,
+            'sleep_quality_breakdown' => $sleepQualityBreakdown,
         ];
 
         return $this->sendResponse($data, 'Mood summary fetched successfully.');

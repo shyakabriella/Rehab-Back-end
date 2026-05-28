@@ -30,6 +30,7 @@ Route::controller(RegisterController::class)->group(function () {
 */
 
 Route::middleware('auth:sanctum')->group(function () {
+
     /*
     |--------------------------------------------------------------------------
     | Authenticated User Routes
@@ -56,13 +57,15 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('mood-logs', [MoodLogController::class, 'index']);
-    Route::post('mood-logs', [MoodLogController::class, 'store']);
-    Route::get('mood-logs/today', [MoodLogController::class, 'today']);
-    Route::get('mood-logs/summary', [MoodLogController::class, 'summary']);
-    Route::get('mood-logs/{id}', [MoodLogController::class, 'show']);
-    Route::put('mood-logs/{id}', [MoodLogController::class, 'update']);
-    Route::delete('mood-logs/{id}', [MoodLogController::class, 'destroy']);
+    Route::prefix('mood-logs')->group(function () {
+        Route::get('/', [MoodLogController::class, 'index']);
+        Route::post('/', [MoodLogController::class, 'store']);
+        Route::get('today', [MoodLogController::class, 'today']);
+        Route::get('summary', [MoodLogController::class, 'summary']);
+        Route::get('{id}', [MoodLogController::class, 'show']);
+        Route::put('{id}', [MoodLogController::class, 'update']);
+        Route::delete('{id}', [MoodLogController::class, 'destroy']);
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -70,12 +73,14 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('trigger-logs', [TriggerLogController::class, 'index']);
-    Route::post('trigger-logs', [TriggerLogController::class, 'store']);
-    Route::get('trigger-logs/summary', [TriggerLogController::class, 'summary']);
-    Route::get('trigger-logs/{id}', [TriggerLogController::class, 'show']);
-    Route::put('trigger-logs/{id}', [TriggerLogController::class, 'update']);
-    Route::delete('trigger-logs/{id}', [TriggerLogController::class, 'destroy']);
+    Route::prefix('trigger-logs')->group(function () {
+        Route::get('/', [TriggerLogController::class, 'index']);
+        Route::post('/', [TriggerLogController::class, 'store']);
+        Route::get('summary', [TriggerLogController::class, 'summary']);
+        Route::get('{id}', [TriggerLogController::class, 'show']);
+        Route::put('{id}', [TriggerLogController::class, 'update']);
+        Route::delete('{id}', [TriggerLogController::class, 'destroy']);
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -83,14 +88,16 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('sobriety-milestones', [SobrietyMilestoneController::class, 'index']);
-    Route::post('sobriety-milestones', [SobrietyMilestoneController::class, 'store']);
-    Route::get('sobriety-milestones/summary', [SobrietyMilestoneController::class, 'summary']);
-    Route::post('sobriety-milestones/generate-defaults', [SobrietyMilestoneController::class, 'generateDefaults']);
-    Route::post('sobriety-milestones/{id}/mark-achieved', [SobrietyMilestoneController::class, 'markAchieved']);
-    Route::get('sobriety-milestones/{id}', [SobrietyMilestoneController::class, 'show']);
-    Route::put('sobriety-milestones/{id}', [SobrietyMilestoneController::class, 'update']);
-    Route::delete('sobriety-milestones/{id}', [SobrietyMilestoneController::class, 'destroy']);
+    Route::prefix('sobriety-milestones')->group(function () {
+        Route::get('/', [SobrietyMilestoneController::class, 'index']);
+        Route::post('/', [SobrietyMilestoneController::class, 'store']);
+        Route::get('summary', [SobrietyMilestoneController::class, 'summary']);
+        Route::post('generate-defaults', [SobrietyMilestoneController::class, 'generateDefaults']);
+        Route::post('{id}/mark-achieved', [SobrietyMilestoneController::class, 'markAchieved']);
+        Route::get('{id}', [SobrietyMilestoneController::class, 'show']);
+        Route::put('{id}', [SobrietyMilestoneController::class, 'update']);
+        Route::delete('{id}', [SobrietyMilestoneController::class, 'destroy']);
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -98,14 +105,16 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('recovery-goals', [RecoveryGoalController::class, 'index']);
-    Route::post('recovery-goals', [RecoveryGoalController::class, 'store']);
-    Route::get('recovery-goals/summary', [RecoveryGoalController::class, 'summary']);
-    Route::post('recovery-goals/{id}/mark-completed', [RecoveryGoalController::class, 'markCompleted']);
-    Route::patch('recovery-goals/{id}/progress', [RecoveryGoalController::class, 'updateProgress']);
-    Route::get('recovery-goals/{id}', [RecoveryGoalController::class, 'show']);
-    Route::put('recovery-goals/{id}', [RecoveryGoalController::class, 'update']);
-    Route::delete('recovery-goals/{id}', [RecoveryGoalController::class, 'destroy']);
+    Route::prefix('recovery-goals')->group(function () {
+        Route::get('/', [RecoveryGoalController::class, 'index']);
+        Route::post('/', [RecoveryGoalController::class, 'store']);
+        Route::get('summary', [RecoveryGoalController::class, 'summary']);
+        Route::post('{id}/mark-completed', [RecoveryGoalController::class, 'markCompleted']);
+        Route::patch('{id}/progress', [RecoveryGoalController::class, 'updateProgress']);
+        Route::get('{id}', [RecoveryGoalController::class, 'show']);
+        Route::put('{id}', [RecoveryGoalController::class, 'update']);
+        Route::delete('{id}', [RecoveryGoalController::class, 'destroy']);
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -113,45 +122,89 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('ai-assistant/assistants', [AiAssistantController::class, 'assistants']);
+    Route::prefix('ai-assistant')->group(function () {
+        Route::get('assistants', [AiAssistantController::class, 'assistants']);
 
-    Route::get('ai-assistant/sessions', [AiAssistantController::class, 'index']);
-    Route::post('ai-assistant/sessions', [AiAssistantController::class, 'startSession']);
-    Route::get('ai-assistant/summary', [AiAssistantController::class, 'summary']);
-    Route::get('ai-assistant/sessions/{id}', [AiAssistantController::class, 'showSession']);
-    Route::post('ai-assistant/sessions/{id}/message', [AiAssistantController::class, 'sendMessage']);
-    Route::post('ai-assistant/sessions/{id}/close', [AiAssistantController::class, 'closeSession']);
-    Route::delete('ai-assistant/sessions/{id}', [AiAssistantController::class, 'destroySession']);
+        Route::get('sessions', [AiAssistantController::class, 'index']);
+        Route::post('sessions', [AiAssistantController::class, 'startSession']);
+        Route::get('summary', [AiAssistantController::class, 'summary']);
+        Route::get('sessions/{id}', [AiAssistantController::class, 'showSession']);
+        Route::post('sessions/{id}/message', [AiAssistantController::class, 'sendMessage']);
+        Route::post('sessions/{id}/close', [AiAssistantController::class, 'closeSession']);
+        Route::delete('sessions/{id}', [AiAssistantController::class, 'destroySession']);
+    });
 
     /*
     |--------------------------------------------------------------------------
     | Community Routes
     |--------------------------------------------------------------------------
+    |
+    | Admin/moderator can create groups from dashboard.
+    | Mobile users fetch active groups and select one before posting.
+    |
     */
 
-    Route::get('community/summary', [CommunityController::class, 'summary']);
+    Route::prefix('community')->group(function () {
 
-    Route::get('community/groups', [CommunityController::class, 'groups']);
-    Route::post('community/groups', [CommunityController::class, 'storeGroup']);
-    Route::get('community/groups/{id}', [CommunityController::class, 'showGroup']);
-    Route::put('community/groups/{id}', [CommunityController::class, 'updateGroup']);
-    Route::delete('community/groups/{id}', [CommunityController::class, 'deleteGroup']);
+        /*
+        |--------------------------------------------------------------------------
+        | Community Summary
+        |--------------------------------------------------------------------------
+        */
 
-    Route::get('community/posts', [CommunityController::class, 'posts']);
-    Route::post('community/posts', [CommunityController::class, 'storePost']);
-    Route::get('community/posts/{id}', [CommunityController::class, 'showPost']);
-    Route::put('community/posts/{id}', [CommunityController::class, 'updatePost']);
-    Route::delete('community/posts/{id}', [CommunityController::class, 'deletePost']);
-    Route::post('community/posts/{id}/support', [CommunityController::class, 'supportPost']);
+        Route::get('summary', [CommunityController::class, 'summary']);
 
-    Route::get('community/posts/{postId}/comments', [CommunityController::class, 'comments']);
-    Route::post('community/posts/{postId}/comments', [CommunityController::class, 'storeComment']);
-    Route::put('community/comments/{id}', [CommunityController::class, 'updateComment']);
-    Route::delete('community/comments/{id}', [CommunityController::class, 'deleteComment']);
+        /*
+        |--------------------------------------------------------------------------
+        | Community Group Routes
+        |--------------------------------------------------------------------------
+        */
 
-    Route::post('community/reports', [CommunityController::class, 'reportContent']);
-    Route::get('community/reports', [CommunityController::class, 'reports']);
-    Route::put('community/reports/{id}', [CommunityController::class, 'updateReport']);
+        Route::get('groups', [CommunityController::class, 'groups']);
+        Route::post('groups', [CommunityController::class, 'storeGroup']);
+        Route::get('groups/{id}', [CommunityController::class, 'showGroup']);
+        Route::put('groups/{id}', [CommunityController::class, 'updateGroup']);
+        Route::patch('groups/{id}', [CommunityController::class, 'updateGroup']);
+        Route::delete('groups/{id}', [CommunityController::class, 'deleteGroup']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Community Post Routes
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('posts', [CommunityController::class, 'posts']);
+        Route::post('posts', [CommunityController::class, 'storePost']);
+        Route::get('posts/{id}', [CommunityController::class, 'showPost']);
+        Route::put('posts/{id}', [CommunityController::class, 'updatePost']);
+        Route::patch('posts/{id}', [CommunityController::class, 'updatePost']);
+        Route::delete('posts/{id}', [CommunityController::class, 'deletePost']);
+        Route::post('posts/{id}/support', [CommunityController::class, 'supportPost']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Community Comment Routes
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('posts/{postId}/comments', [CommunityController::class, 'comments']);
+        Route::post('posts/{postId}/comments', [CommunityController::class, 'storeComment']);
+
+        Route::put('comments/{id}', [CommunityController::class, 'updateComment']);
+        Route::patch('comments/{id}', [CommunityController::class, 'updateComment']);
+        Route::delete('comments/{id}', [CommunityController::class, 'deleteComment']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Community Report Routes
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('reports', [CommunityController::class, 'reportContent']);
+        Route::get('reports', [CommunityController::class, 'reports']);
+        Route::put('reports/{id}', [CommunityController::class, 'updateReport']);
+        Route::patch('reports/{id}', [CommunityController::class, 'updateReport']);
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -159,28 +212,59 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('awareness/summary', [AwarenessController::class, 'summary']);
+    Route::prefix('awareness')->group(function () {
 
-    Route::get('awareness/categories', [AwarenessController::class, 'categories']);
-    Route::post('awareness/categories', [AwarenessController::class, 'storeCategory']);
-    Route::put('awareness/categories/{id}', [AwarenessController::class, 'updateCategory']);
-    Route::delete('awareness/categories/{id}', [AwarenessController::class, 'deleteCategory']);
+        Route::get('summary', [AwarenessController::class, 'summary']);
 
-    Route::get('awareness/campaigns', [AwarenessController::class, 'campaigns']);
-    Route::post('awareness/campaigns', [AwarenessController::class, 'storeCampaign']);
-    Route::get('awareness/campaigns/{id}', [AwarenessController::class, 'showCampaign']);
-    Route::put('awareness/campaigns/{id}', [AwarenessController::class, 'updateCampaign']);
-    Route::delete('awareness/campaigns/{id}', [AwarenessController::class, 'deleteCampaign']);
+        /*
+        |--------------------------------------------------------------------------
+        | Awareness Category Routes
+        |--------------------------------------------------------------------------
+        */
 
-    Route::post('awareness/campaigns/{campaignId}/contents', [AwarenessController::class, 'storeCampaignContent']);
-    Route::put('awareness/campaign-contents/{id}', [AwarenessController::class, 'updateCampaignContent']);
-    Route::delete('awareness/campaign-contents/{id}', [AwarenessController::class, 'deleteCampaignContent']);
+        Route::get('categories', [AwarenessController::class, 'categories']);
+        Route::post('categories', [AwarenessController::class, 'storeCategory']);
+        Route::put('categories/{id}', [AwarenessController::class, 'updateCategory']);
+        Route::patch('categories/{id}', [AwarenessController::class, 'updateCategory']);
+        Route::delete('categories/{id}', [AwarenessController::class, 'deleteCategory']);
 
-    Route::get('awareness/resources', [AwarenessController::class, 'resources']);
-    Route::post('awareness/resources', [AwarenessController::class, 'storeResource']);
-    Route::get('awareness/resources/{id}', [AwarenessController::class, 'showResource']);
-    Route::put('awareness/resources/{id}', [AwarenessController::class, 'updateResource']);
-    Route::delete('awareness/resources/{id}', [AwarenessController::class, 'deleteResource']);
+        /*
+        |--------------------------------------------------------------------------
+        | Awareness Campaign Routes
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('campaigns', [AwarenessController::class, 'campaigns']);
+        Route::post('campaigns', [AwarenessController::class, 'storeCampaign']);
+        Route::get('campaigns/{id}', [AwarenessController::class, 'showCampaign']);
+        Route::put('campaigns/{id}', [AwarenessController::class, 'updateCampaign']);
+        Route::patch('campaigns/{id}', [AwarenessController::class, 'updateCampaign']);
+        Route::delete('campaigns/{id}', [AwarenessController::class, 'deleteCampaign']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Awareness Campaign Content Routes
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post('campaigns/{campaignId}/contents', [AwarenessController::class, 'storeCampaignContent']);
+        Route::put('campaign-contents/{id}', [AwarenessController::class, 'updateCampaignContent']);
+        Route::patch('campaign-contents/{id}', [AwarenessController::class, 'updateCampaignContent']);
+        Route::delete('campaign-contents/{id}', [AwarenessController::class, 'deleteCampaignContent']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Awareness Resource Routes
+        |--------------------------------------------------------------------------
+        */
+
+        Route::get('resources', [AwarenessController::class, 'resources']);
+        Route::post('resources', [AwarenessController::class, 'storeResource']);
+        Route::get('resources/{id}', [AwarenessController::class, 'showResource']);
+        Route::put('resources/{id}', [AwarenessController::class, 'updateResource']);
+        Route::patch('resources/{id}', [AwarenessController::class, 'updateResource']);
+        Route::delete('resources/{id}', [AwarenessController::class, 'deleteResource']);
+    });
 
     /*
     |--------------------------------------------------------------------------
@@ -188,22 +272,41 @@ Route::middleware('auth:sanctum')->group(function () {
     |--------------------------------------------------------------------------
     */
 
-    Route::get('notifications/summary', [NotificationController::class, 'summary']);
-    Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+    Route::prefix('notifications')->group(function () {
+        Route::get('summary', [NotificationController::class, 'summary']);
+        Route::post('mark-all-read', [NotificationController::class, 'markAllAsRead']);
 
-    Route::get('notifications', [NotificationController::class, 'index']);
-    Route::post('notifications', [NotificationController::class, 'store']);
-    Route::get('notifications/{id}', [NotificationController::class, 'show']);
-    Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
-    Route::delete('notifications/{id}', [NotificationController::class, 'destroy']);
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::post('/', [NotificationController::class, 'store']);
+        Route::get('{id}', [NotificationController::class, 'show']);
+        Route::post('{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::delete('{id}', [NotificationController::class, 'destroy']);
+    });
 
-    Route::get('reminders', [NotificationController::class, 'reminders']);
-    Route::post('reminders', [NotificationController::class, 'storeReminder']);
-    Route::get('reminders/{id}', [NotificationController::class, 'showReminder']);
-    Route::put('reminders/{id}', [NotificationController::class, 'updateReminder']);
-    Route::delete('reminders/{id}', [NotificationController::class, 'deleteReminder']);
+    /*
+    |--------------------------------------------------------------------------
+    | Reminder Routes
+    |--------------------------------------------------------------------------
+    */
 
-    Route::post('device-tokens', [NotificationController::class, 'registerDeviceToken']);
-    Route::get('device-tokens', [NotificationController::class, 'myDeviceTokens']);
-    Route::post('device-tokens/{id}/deactivate', [NotificationController::class, 'deactivateDeviceToken']);
+    Route::prefix('reminders')->group(function () {
+        Route::get('/', [NotificationController::class, 'reminders']);
+        Route::post('/', [NotificationController::class, 'storeReminder']);
+        Route::get('{id}', [NotificationController::class, 'showReminder']);
+        Route::put('{id}', [NotificationController::class, 'updateReminder']);
+        Route::patch('{id}', [NotificationController::class, 'updateReminder']);
+        Route::delete('{id}', [NotificationController::class, 'deleteReminder']);
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Device Token Routes
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('device-tokens')->group(function () {
+        Route::post('/', [NotificationController::class, 'registerDeviceToken']);
+        Route::get('/', [NotificationController::class, 'myDeviceTokens']);
+        Route::post('{id}/deactivate', [NotificationController::class, 'deactivateDeviceToken']);
+    });
 });

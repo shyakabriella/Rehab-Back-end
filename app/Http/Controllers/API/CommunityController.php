@@ -24,9 +24,11 @@ class CommunityController extends BaseController
     public function groups(Request $request): JsonResponse
     {
         $query = CommunityGroup::query()
-            ->withCount(['posts' => function ($query) {
-                $query->where('status', 'published');
-            }])
+            ->withCount([
+                'posts' => function ($query) {
+                    $query->where('status', 'published');
+                }
+            ])
             ->orderBy('name');
 
         if ($request->filled('category')) {
@@ -47,7 +49,7 @@ class CommunityController extends BaseController
         if (!$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'Only admin or moderator can create community groups.'
-            ]);
+            ], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -69,16 +71,24 @@ class CommunityController extends BaseController
         ]);
 
         if ($validator->fails()) {
-            return $this->sendError('Validation Error.', $validator->errors());
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
 
         $group = CommunityGroup::create([
             'created_by' => $request->user()->id,
-            'name' => $request->name,
+            'name' => trim($request->name),
             'slug' => Str::slug($request->name) . '-' . Str::random(5),
             'description' => $request->description,
             'category' => $request->category ?? 'general',
-            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : true,
+            'is_active' => $request->has('is_active')
+                ? $request->boolean('is_active')
+                : true,
+        ]);
+
+        $group->loadCount([
+            'posts' => function ($query) {
+                $query->where('status', 'published');
+            }
         ]);
 
         return $this->sendResponse($group, 'Community group created successfully.');
@@ -86,21 +96,23 @@ class CommunityController extends BaseController
 
     public function showGroup(Request $request, int $id): JsonResponse
     {
-        $group = CommunityGroup::withCount(['posts' => function ($query) {
-                $query->where('status', 'published');
-            }])
+        $group = CommunityGroup::withCount([
+                'posts' => function ($query) {
+                    $query->where('status', 'published');
+                }
+            ])
             ->find($id);
 
         if (!$group) {
             return $this->sendError('Community group not found.', [
                 'error' => 'This group does not exist.'
-            ]);
+            ], 404);
         }
 
         if (!$group->is_active && !$request->user()->canModerateCommunity()) {
             return $this->sendError('Community group inactive.', [
                 'error' => 'This group is not active.'
-            ]);
+            ], 403);
         }
 
         return $this->sendResponse($group, 'Community group fetched successfully.');
@@ -111,7 +123,7 @@ class CommunityController extends BaseController
         if (!$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'Only admin or moderator can update community groups.'
-            ]);
+            ], 403);
         }
 
         $group = CommunityGroup::find($id);
@@ -119,7 +131,7 @@ class CommunityController extends BaseController
         if (!$group) {
             return $this->sendError('Community group not found.', [
                 'error' => 'This group does not exist.'
-            ]);
+            ], 404);
         }
 
         $validator = Validator::make($request->all(), [
@@ -141,18 +153,22 @@ class CommunityController extends BaseController
         ]);
 
         if ($validator->fails()) {
-            return $this->sendError('Validation Error.', $validator->errors());
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
 
-        $data = $request->only([
-            'name',
-            'description',
-            'category',
-            'is_active',
-        ]);
+        $data = [];
 
         if ($request->filled('name')) {
+            $data['name'] = trim($request->name);
             $data['slug'] = Str::slug($request->name) . '-' . Str::random(5);
+        }
+
+        if ($request->has('description')) {
+            $data['description'] = $request->description;
+        }
+
+        if ($request->filled('category')) {
+            $data['category'] = $request->category;
         }
 
         if ($request->has('is_active')) {
@@ -160,6 +176,12 @@ class CommunityController extends BaseController
         }
 
         $group->update($data);
+
+        $group->loadCount([
+            'posts' => function ($query) {
+                $query->where('status', 'published');
+            }
+        ]);
 
         return $this->sendResponse($group, 'Community group updated successfully.');
     }
@@ -169,15 +191,26 @@ class CommunityController extends BaseController
         if (!$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'Only admin or moderator can delete community groups.'
-            ]);
+            ], 403);
         }
 
-        $group = CommunityGroup::find($id);
+        $group = CommunityGroup::withCount('posts')->find($id);
 
         if (!$group) {
             return $this->sendError('Community group not found.', [
                 'error' => 'This group does not exist.'
+            ], 404);
+        }
+
+        if ($group->posts_count > 0) {
+            $group->update([
+                'is_active' => false,
             ]);
+
+            return $this->sendResponse(
+                $group,
+                'This group has posts, so it was deactivated instead of deleted.'
+            );
         }
 
         $group->delete();
@@ -197,9 +230,11 @@ class CommunityController extends BaseController
                 'group:id,name,slug,category',
                 'user:id,name,anonymous_name,is_anonymous'
             ])
-            ->withCount(['comments' => function ($query) {
-                $query->where('status', 'published');
-            }])
+            ->withCount([
+                'comments' => function ($query) {
+                    $query->where('status', 'published');
+                }
+            ])
             ->orderByDesc('created_at');
 
         if (!$request->user()->canModerateCommunity()) {
@@ -251,7 +286,7 @@ class CommunityController extends BaseController
         ]);
 
         if ($validator->fails()) {
-            return $this->sendError('Validation Error.', $validator->errors());
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
 
         $group = CommunityGroup::where('id', $request->community_group_id)
@@ -261,7 +296,7 @@ class CommunityController extends BaseController
         if (!$group) {
             return $this->sendError('Community group unavailable.', [
                 'error' => 'This community group is not active or does not exist.'
-            ]);
+            ], 422);
         }
 
         $post = CommunityPost::create([
@@ -270,11 +305,16 @@ class CommunityController extends BaseController
             'title' => $request->title,
             'body' => $request->body,
             'mood_tag' => $request->mood_tag ?? 'general',
-            'is_anonymous' => $request->has('is_anonymous') ? $request->boolean('is_anonymous') : true,
+            'is_anonymous' => $request->has('is_anonymous')
+                ? $request->boolean('is_anonymous')
+                : true,
             'status' => 'published',
         ]);
 
-        $post->load(['group:id,name,slug,category', 'user:id,name,anonymous_name,is_anonymous']);
+        $post->load([
+            'group:id,name,slug,category',
+            'user:id,name,anonymous_name,is_anonymous'
+        ]);
 
         return $this->sendResponse($post, 'Community post created successfully.');
     }
@@ -295,7 +335,7 @@ class CommunityController extends BaseController
         if (!$post) {
             return $this->sendError('Community post not found.', [
                 'error' => 'This post does not exist.'
-            ]);
+            ], 404);
         }
 
         if (
@@ -305,7 +345,7 @@ class CommunityController extends BaseController
         ) {
             return $this->sendError('Forbidden.', [
                 'error' => 'You cannot view this post.'
-            ]);
+            ], 403);
         }
 
         return $this->sendResponse($post, 'Community post fetched successfully.');
@@ -318,13 +358,13 @@ class CommunityController extends BaseController
         if (!$post) {
             return $this->sendError('Community post not found.', [
                 'error' => 'This post does not exist.'
-            ]);
+            ], 404);
         }
 
         if ($post->user_id !== $request->user()->id && !$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'You can only update your own post.'
-            ]);
+            ], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -348,14 +388,13 @@ class CommunityController extends BaseController
         ]);
 
         if ($validator->fails()) {
-            return $this->sendError('Validation Error.', $validator->errors());
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
 
         $data = $request->only([
             'title',
             'body',
             'mood_tag',
-            'is_anonymous',
         ]);
 
         if ($request->has('is_anonymous')) {
@@ -368,6 +407,11 @@ class CommunityController extends BaseController
 
         $post->update($data);
 
+        $post->load([
+            'group:id,name,slug,category',
+            'user:id,name,anonymous_name,is_anonymous'
+        ]);
+
         return $this->sendResponse($post, 'Community post updated successfully.');
     }
 
@@ -378,16 +422,19 @@ class CommunityController extends BaseController
         if (!$post) {
             return $this->sendError('Community post not found.', [
                 'error' => 'This post does not exist.'
-            ]);
+            ], 404);
         }
 
         if ($post->user_id !== $request->user()->id && !$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'You can only delete your own post.'
-            ]);
+            ], 403);
         }
 
-        $post->update(['status' => 'deleted']);
+        $post->update([
+            'status' => 'deleted'
+        ]);
+
         $post->delete();
 
         return $this->sendResponse([], 'Community post deleted successfully.');
@@ -402,7 +449,7 @@ class CommunityController extends BaseController
         if (!$post) {
             return $this->sendError('Community post not found.', [
                 'error' => 'This post does not exist or is not published.'
-            ]);
+            ], 404);
         }
 
         $post->increment('support_count');
@@ -425,7 +472,7 @@ class CommunityController extends BaseController
         if (!$post) {
             return $this->sendError('Community post not found.', [
                 'error' => 'This post does not exist or is not published.'
-            ]);
+            ], 404);
         }
 
         $comments = CommunityComment::where('community_post_id', $post->id)
@@ -446,7 +493,7 @@ class CommunityController extends BaseController
         if (!$post) {
             return $this->sendError('Community post not found.', [
                 'error' => 'This post does not exist or is not published.'
-            ]);
+            ], 404);
         }
 
         $validator = Validator::make($request->all(), [
@@ -455,14 +502,16 @@ class CommunityController extends BaseController
         ]);
 
         if ($validator->fails()) {
-            return $this->sendError('Validation Error.', $validator->errors());
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
 
         $comment = CommunityComment::create([
             'community_post_id' => $post->id,
             'user_id' => $request->user()->id,
             'body' => $request->body,
-            'is_anonymous' => $request->has('is_anonymous') ? $request->boolean('is_anonymous') : true,
+            'is_anonymous' => $request->has('is_anonymous')
+                ? $request->boolean('is_anonymous')
+                : true,
             'status' => 'published',
         ]);
 
@@ -480,13 +529,13 @@ class CommunityController extends BaseController
         if (!$comment) {
             return $this->sendError('Community comment not found.', [
                 'error' => 'This comment does not exist.'
-            ]);
+            ], 404);
         }
 
         if ($comment->user_id !== $request->user()->id && !$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'You can only update your own comment.'
-            ]);
+            ], 403);
         }
 
         $validator = Validator::make($request->all(), [
@@ -496,12 +545,11 @@ class CommunityController extends BaseController
         ]);
 
         if ($validator->fails()) {
-            return $this->sendError('Validation Error.', $validator->errors());
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
 
         $data = $request->only([
             'body',
-            'is_anonymous',
         ]);
 
         if ($request->has('is_anonymous')) {
@@ -524,16 +572,18 @@ class CommunityController extends BaseController
         if (!$comment) {
             return $this->sendError('Community comment not found.', [
                 'error' => 'This comment does not exist.'
-            ]);
+            ], 404);
         }
 
         if ($comment->user_id !== $request->user()->id && !$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'You can only delete your own comment.'
-            ]);
+            ], 403);
         }
 
-        $comment->update(['status' => 'deleted']);
+        $comment->update([
+            'status' => 'deleted'
+        ]);
 
         $post = CommunityPost::find($comment->community_post_id);
 
@@ -562,7 +612,7 @@ class CommunityController extends BaseController
         ]);
 
         if ($validator->fails()) {
-            return $this->sendError('Validation Error.', $validator->errors());
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
 
         $postId = null;
@@ -574,7 +624,7 @@ class CommunityController extends BaseController
             if (!$post) {
                 return $this->sendError('Community post not found.', [
                     'error' => 'This post does not exist.'
-                ]);
+                ], 404);
             }
 
             $postId = $post->id;
@@ -586,7 +636,7 @@ class CommunityController extends BaseController
             if (!$comment) {
                 return $this->sendError('Community comment not found.', [
                     'error' => 'This comment does not exist.'
-                ]);
+                ], 404);
             }
 
             $commentId = $comment->id;
@@ -609,7 +659,7 @@ class CommunityController extends BaseController
         if (!$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'Only admin or moderator can view reports.'
-            ]);
+            ], 403);
         }
 
         $query = ReportedContent::with([
@@ -634,7 +684,7 @@ class CommunityController extends BaseController
         if (!$request->user()->canModerateCommunity()) {
             return $this->sendError('Forbidden.', [
                 'error' => 'Only admin or moderator can update reports.'
-            ]);
+            ], 403);
         }
 
         $report = ReportedContent::find($id);
@@ -642,7 +692,7 @@ class CommunityController extends BaseController
         if (!$report) {
             return $this->sendError('Report not found.', [
                 'error' => 'This report does not exist.'
-            ]);
+            ], 404);
         }
 
         $validator = Validator::make($request->all(), [
@@ -651,7 +701,7 @@ class CommunityController extends BaseController
         ]);
 
         if ($validator->fails()) {
-            return $this->sendError('Validation Error.', $validator->errors());
+            return $this->sendError('Validation Error.', $validator->errors(), 422);
         }
 
         $report->update([
