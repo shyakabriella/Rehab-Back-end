@@ -40,6 +40,12 @@ class User extends Authenticatable
         ];
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | User Role and Profile Relationships
+    |--------------------------------------------------------------------------
+    */
+
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);
@@ -49,6 +55,12 @@ class User extends Authenticatable
     {
         return $this->hasOne(Profile::class);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recovery Tracking Relationships
+    |--------------------------------------------------------------------------
+    */
 
     public function moodLogs(): HasMany
     {
@@ -70,6 +82,59 @@ class User extends Authenticatable
         return $this->hasMany(RecoveryGoal::class);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Patient Condition and Reporting Relationships
+    |--------------------------------------------------------------------------
+    |
+    | patientConditions:
+    | Addiction and illness records belonging to this patient.
+    |
+    | recoveryAwards:
+    | Recovery awards issued to this patient.
+    |
+    | issuedRecoveryAwards:
+    | Recovery awards issued by this user as an administrator or moderator.
+    |
+    | revokedRecoveryAwards:
+    | Recovery awards revoked by this user.
+    |
+    | systemActivityLogs:
+    | API and system activity records belonging to this user.
+    |
+    */
+
+    public function patientConditions(): HasMany
+    {
+        return $this->hasMany(PatientCondition::class);
+    }
+
+    public function recoveryAwards(): HasMany
+    {
+        return $this->hasMany(RecoveryAward::class);
+    }
+
+    public function issuedRecoveryAwards(): HasMany
+    {
+        return $this->hasMany(RecoveryAward::class, 'awarded_by');
+    }
+
+    public function revokedRecoveryAwards(): HasMany
+    {
+        return $this->hasMany(RecoveryAward::class, 'revoked_by');
+    }
+
+    public function systemActivityLogs(): HasMany
+    {
+        return $this->hasMany(SystemActivityLog::class);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | AI Assistant Relationships
+    |--------------------------------------------------------------------------
+    */
+
     public function aiSessions(): HasMany
     {
         return $this->hasMany(AiSession::class);
@@ -79,6 +144,12 @@ class User extends Authenticatable
     {
         return $this->hasManyThrough(AiMessage::class, AiSession::class);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Community Relationships
+    |--------------------------------------------------------------------------
+    */
 
     public function communityGroupsCreated(): HasMany
     {
@@ -97,28 +168,55 @@ class User extends Authenticatable
 
     public function reportedContents(): HasMany
     {
-        return $this->hasMany(ReportedContent::class, 'reporter_user_id');
+        return $this->hasMany(
+            ReportedContent::class,
+            'reporter_user_id'
+        );
     }
 
     public function reviewedReports(): HasMany
     {
-        return $this->hasMany(ReportedContent::class, 'reviewed_by');
+        return $this->hasMany(
+            ReportedContent::class,
+            'reviewed_by'
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Awareness Relationships
+    |--------------------------------------------------------------------------
+    */
 
     public function campaignsCreated(): HasMany
     {
-        return $this->hasMany(Campaign::class, 'created_by');
+        return $this->hasMany(
+            Campaign::class,
+            'created_by'
+        );
     }
 
     public function campaignContentsCreated(): HasMany
     {
-        return $this->hasMany(CampaignContent::class, 'created_by');
+        return $this->hasMany(
+            CampaignContent::class,
+            'created_by'
+        );
     }
 
     public function resourcesCreated(): HasMany
     {
-        return $this->hasMany(Resource::class, 'created_by');
+        return $this->hasMany(
+            Resource::class,
+            'created_by'
+        );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification and Device Relationships
+    |--------------------------------------------------------------------------
+    */
 
     public function deviceTokens(): HasMany
     {
@@ -132,13 +230,22 @@ class User extends Authenticatable
 
     public function notificationsCreated(): HasMany
     {
-        return $this->hasMany(AppNotification::class, 'created_by');
+        return $this->hasMany(
+            AppNotification::class,
+            'created_by'
+        );
     }
 
     public function reminders(): HasMany
     {
         return $this->hasMany(Reminder::class);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Role Helpers
+    |--------------------------------------------------------------------------
+    */
 
     public function isAdmin(): bool
     {
@@ -170,9 +277,23 @@ class User extends Authenticatable
         return $this->isAdmin() || $this->isModerator();
     }
 
+    public function canManageReports(): bool
+    {
+        return $this->isAdmin() || $this->isModerator();
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Accessors
+    |--------------------------------------------------------------------------
+    */
+
     public function getDisplayNameAttribute(): string
     {
-        if ($this->is_anonymous && !empty($this->anonymous_name)) {
+        if (
+            $this->is_anonymous &&
+            !empty($this->anonymous_name)
+        ) {
             return $this->anonymous_name;
         }
 
